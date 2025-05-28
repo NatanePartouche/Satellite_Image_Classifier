@@ -101,6 +101,10 @@ def compress_images(input_folder, output_folder, report_csv=None):
         report_csv (str): Optional path to save a compression report (CSV)
     """
 
+    # Create the output folder if it doesn't exist
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
+    
     # Store data for optional CSV report
     report_data = []
 
