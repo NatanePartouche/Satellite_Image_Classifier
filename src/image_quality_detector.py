@@ -188,125 +188,96 @@ def is_earth_image(gray, image_color):
 
 # ============================================================
 # 📌 Horizon detection
+
 def fit_circle_least_squares(xs, ys):
     """
-    Ajuste un cercle sur un ensemble de points 2D en utilisant la méthode des moindres carrés.
-
-    Paramètres :
-        xs, ys : tableaux numpy contenant les coordonnées x et y des points d’un contour
-
-    Retour :
-        (cx, cy, radius) : centre et rayon du cercle ajusté
-
-    Méthode :
-        Résout une équation algébrique dérivée de la forme canonique d’un cercle :
-        (x - cx)^2 + (y - cy)^2 = r^2
+    Fits a circle to a set of 2D points using the least squares method.
     """
-    A = np.c_[2*xs, 2*ys, np.ones(len(xs))]  # Matrice des coefficients
-    B = xs**2 + ys**2                        # Terme indépendant
-    sol, _, _, _ = np.linalg.lstsq(A, B, rcond=None)  # Résolution du système
-    cx, cy, c = sol
-    radius = np.sqrt(c + cx**2 + cy**2)
-    return int(cx), int(cy), int(radius)
+    A = np.c_[2*xs, 2*ys, np.ones(len(xs))]  # Construct the coefficient matrix A with 2x, 2y, and ones
+    B = xs**2 + ys**2                        # Construct the independent term vector B as x² + y²
+    sol, _, _, _ = np.linalg.lstsq(A, B, rcond=None)  # Solve the linear system A·sol = B using least squares
+    cx, cy, c = sol                          # Extract the circle center coordinates and constant term
+    radius = np.sqrt(c + cx**2 + cy**2)      # Compute the radius from the solution
+    return int(cx), int(cy), int(radius)     # Return center coordinates and radius as integers
+
 def detect_horizon_line(image_gray):
     """
-    Détecte l’arc d’horizon le plus plausible dans une image en niveaux de gris.
-
-    Paramètre :
-        image_gray : image 2D numpy (grayscale)
-
-    Retour :
-        (cx, cy, radius) : centre et rayon du cercle ajusté représentant l’horizon, ou None si échec
+    Detects the most plausible horizon arc in a grayscale image.
     """
-    h, w = image_gray.shape  # Hauteur et largeur de l’image
+    h, w = image_gray.shape  # Get image height and width
 
-    # 1. Réduction du bruit avec un flou gaussien
-    blurred = cv2.GaussianBlur(image_gray, (5, 5), 0)
+    blurred = cv2.GaussianBlur(image_gray, (5, 5), 0)  # Apply Gaussian blur to reduce noise
 
-    # 2. Détection des bords avec l’algorithme de Canny
-    edges = cv2.Canny(blurred, 50, 150)
+    edges = cv2.Canny(blurred, 50, 150)  # Apply Canny edge detection
 
-    # 3. Recherche des contours externes
-    contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)  # Find external contours
 
-    best_contour = None
-    max_score = -1  # Score max pour déterminer le meilleur contour
+    best_contour = None            # Initialize variable to store the best contour
+    max_score = -1                 # Initialize max score for comparison
 
-    # 4. Filtrage des contours
-    for cnt in contours:
+    for cnt in contours:          # Loop through all contours
         if len(cnt) < 30:
-            continue  # Ignore les petits contours
+            continue              # Ignore small contours
 
-        xs = cnt[:, 0, 0]
-        ys = cnt[:, 0, 1]
-        x, y, w_box, h_box = cv2.boundingRect(cnt)
-        arc_len = cv2.arcLength(cnt, True)
+        xs = cnt[:, 0, 0]         # Extract x-coordinates of the contour
+        ys = cnt[:, 0, 1]         # Extract y-coordinates of the contour
+        x, y, w_box, h_box = cv2.boundingRect(cnt)  # Get bounding box around the contour
+        arc_len = cv2.arcLength(cnt, True)          # Compute the arc length (perimeter) of the contour
 
         if w_box < 100 or h_box < 100 or arc_len < 300:
-            continue  # Ignore les petits objets
+            continue              # Skip small or short-length contours
 
-        # Le contour doit toucher au moins un bord de l’image
-        touches_border = (
+        touches_border = (        # Check if the contour touches the border of the image
             x <= 5 or y <= 5 or
             x + w_box >= w - 5 or
             y + h_box >= h - 5
         )
         if not touches_border:
-            continue
+            continue              # Discard contours not touching the image borders
 
-        score = w_box * h_box
+        score = w_box * h_box     # Score based on area of bounding box
         if score > max_score:
-            max_score = score
-            best_contour = cnt
+            max_score = score     # Update max score
+            best_contour = cnt    # Store the best contour
 
     if best_contour is None:
-        return None  # Aucun contour valide trouvé
+        return None               # No valid contour found
 
-    # 5. Ajustement d’un cercle sur le contour sélectionné
-    points = best_contour[:, 0, :]
-    xs = points[:, 0]
-    ys = points[:, 1]
-    cx, cy, radius = fit_circle_least_squares(xs, ys)
+    points = best_contour[:, 0, :]  # Extract point coordinates from contour
+    xs = points[:, 0]               # x values of contour points
+    ys = points[:, 1]               # y values of contour points
+    cx, cy, radius = fit_circle_least_squares(xs, ys)  # Fit a circle to the points
 
-    # 6. Validation du cercle (précision de l’ajustement)
-    dists = np.sqrt((xs - cx)**2 + (ys - cy)**2)
-    error = np.abs(dists - radius)
-    mean_error = np.mean(error)
+    dists = np.sqrt((xs - cx)**2 + (ys - cy)**2)  # Compute distances from each point to the circle center
+    error = np.abs(dists - radius)               # Compute fitting error
+    mean_error = np.mean(error)                  # Compute average fitting error
 
-    # 7. Rejet si :
-    if mean_error > 15:       # Mauvais ajustement
+    if mean_error > 15:       # Reject if fit is not accurate
         return None
-    if radius < 100:          # Trop petit pour représenter la Terre
+    if radius < 100:          # Reject if the circle is too small to be the Earth
         return None
     if abs(cx - w // 2) < w * 0.25 and abs(cy - h // 2) < h * 0.25:
-        return None  # Centre trop proche → disque entier de la Terre
+        return None           # Reject if center is too close to image center (likely full Earth disk)
 
-    return cx, cy, radius
+    return cx, cy, radius     # Return valid circle parameters
 
 def is_horizon_image(gray, image_color):
     """
     Checks whether a given image contains a recognizable horizon.
-
-    - gray: grayscale image (2D numpy array)
-    - image_color: color image (will be annotated if horizon is detected)
-
-    Returns: True if a horizon is detected, otherwise False.
     """
-    result = detect_horizon_line(gray)  # Attempts to detect a circle representing the horizon
+    result = detect_horizon_line(gray)  # Try to detect a circle that represents the horizon
 
     if result is not None:
-        cx, cy, radius = result  # Center coordinates and radius of the detected circle
+        cx, cy, radius = result  # Get circle center and radius
 
-        # Draws the detected circle on the color image
-        cv2.circle(image_color, (cx, cy), radius, COLORS["HZ_Horizon"], 2)
+        cv2.circle(image_color, (cx, cy), radius, COLORS["HZ_Horizon"], 2)  # Draw circle on image
 
-        # Adds a text label on the image
-        cv2.putText(image_color, "HZ_Horizon", (10, 120),
+        cv2.putText(image_color, "HZ_Horizon", (10, 120),                  # Add label text to the image
                     cv2.FONT_HERSHEY_SIMPLEX, 1, COLORS["HZ_Horizon"], 2)
 
-        return True
+        return True  # Horizon successfully detected
 
-    return False
+    return False  # Horizon not detected
 
 # ============================================================
 # 📌 Space detection
