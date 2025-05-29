@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from image_quality_detector_config import THRESHOLDS, COLORS
+from detector_config import THRESHOLDS, COLORS
 
 """
 ====================================================================
