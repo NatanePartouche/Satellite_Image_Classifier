@@ -14,10 +14,13 @@ The system evaluates each image using custom quality metrics and detection logic
 │   └── image_quality_detector.py   # Image quality and content detection logic
 ├── DataSet/
 │   ├── Input_Image/                # Folder for raw, unclassified images
-│   ├── Output_Image/
-│   │   ├── Good_Image/             # High-quality and relevant images
-│   │   ├── Bad_Image/              # Low-quality or irrelevant images
-│   │   └── Final_Output/           # Final filtered results used for output
+│   └── Output_Image/
+│       ├── Good_Image/             # High-quality and relevant images
+│       ├── Bad_Image/              # Low-quality or irrelevant images
+│       └── Final_Output/           # Final filtered results used for output
+├── Explanatory Presentation.pdf
+├── README.md
+└── Report.pdf
 ```
 
 ## 🧠 Key Features
