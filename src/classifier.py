@@ -1,9 +1,10 @@
 # 📦 Import standard libraries and custom detection functions
 import os                 # Used for file and directory operations
 import cv2                # OpenCV library for image processing
+import csv
+import shutil
 from PIL import Image     # Pillow library for image manipulation and compression
 from pathlib import Path  # For handling file paths in an OS-independent way
-import csv
 
 # Import image quality detection functions from a local module
 from image_quality_detector import (
@@ -133,7 +134,16 @@ def compress_images(input_folder, output_folder, report_csv=None):
 
             # Skip files that are too small to justify compression
             if original_size < 30:
-                print(f"{filename:<35} {original_size:>14.1f} {'-':>17} {'-':>8} {'-':>9}  ⚠️ Skipped (too small)")
+                shutil.copy2(input_path, output_path)
+                print(
+                    f"{filename:<35} {original_size:>14.1f} {original_size:>17.1f} {'100%':>8} {'-':>9}  ⚠️ Copied (too small)")
+                report_data.append([
+                    filename,
+                    round(original_size, 1),
+                    round(original_size, 1),
+                    "100%",
+                    "-"
+                ])
                 continue
 
             # Open the image using Pillow

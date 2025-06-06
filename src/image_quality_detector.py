@@ -84,6 +84,7 @@ def fit_circle_least_squares(xs, ys):
     cx, cy, c = sol                          # Extract the circle center coordinates and constant term
     radius = np.sqrt(c + cx**2 + cy**2)      # Compute the radius from the solution
     return int(cx), int(cy), int(radius)     # Return center coordinates and radius as integers
+
 def detect_horizon_line(image_gray):
     """
     Detects the most plausible horizon arc in a grayscale image.
@@ -144,23 +145,66 @@ def detect_horizon_line(image_gray):
         return None           # Reject if center is too close to image center (likely full Earth disk)
 
     return cx, cy, radius     # Return valid circle parameters
+
 def is_horizon_image(gray, image_color):
     """
     Checks whether a given image contains a recognizable horizon.
+    Draws adaptively spaced dots along the best detected contour arc.
     """
-    result = detect_horizon_line(gray)  # Try to detect a circle that represents the horizon
+    result = detect_horizon_line(gray)
 
     if result is not None:
-        cx, cy, radius = result  # Get circle center and radius
+        cx, cy, radius = result
 
-        cv2.circle(image_color, (cx, cy), radius, COLORS["HZ_Horizon"], 2)  # Draw circle on image
+        # Recompute contours to access the best one again
+        h, w = gray.shape
+        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+        edges = cv2.Canny(blurred, 50, 150)
+        contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-        cv2.putText(image_color, "HZ_Horizon", (10, 120),                  # Add label text to the image
+        best_contour = None
+        max_score = -1
+
+        for cnt in contours:
+            if len(cnt) < 30:
+                continue
+
+            x, y, w_box, h_box = cv2.boundingRect(cnt)
+            arc_len = cv2.arcLength(cnt, True)
+
+            if w_box < 100 or h_box < 100 or arc_len < 300:
+                continue
+
+            touches_border = (
+                x <= 5 or y <= 5 or
+                x + w_box >= w - 5 or
+                y + h_box >= h - 5
+            )
+            if not touches_border:
+                continue
+
+            score = w_box * h_box
+            if score > max_score:
+                max_score = score
+                best_contour = cnt
+
+        # ✅ Draw adaptively spaced dots along the contour
+        if best_contour is not None:
+            max_dots = 30  # Max number of points to draw
+            step = max(1, len(best_contour) // max_dots)
+
+            for pt in best_contour[::step]:
+                x, y = pt[0]
+                if 0 <= x < image_color.shape[1] and 0 <= y < image_color.shape[0]:
+                    cv2.circle(image_color, (x, y), 2, COLORS["HZ_Horizon"], -1)
+
+        # Label the detection
+        cv2.putText(image_color, "HZ_Horizon", (10, 120),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, COLORS["HZ_Horizon"], 2)
 
-        return True  # Horizon successfully detected
+        return True
 
-    return False  # Horizon not detected
+    return False
 
 # ============================================================
 # 📌 Space detection
