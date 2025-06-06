@@ -10,6 +10,7 @@ The system evaluates each image using custom quality metrics and detection logic
 .
 ├── src/
 │   ├── classifier.py               # Main classification pipeline
+│   ├── detector_config.py
 │   └── image_quality_detector.py   # Image quality and content detection logic
 ├── DataSet/
 │   ├── Input_Image/                # Folder for raw, unclassified images
